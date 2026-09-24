@@ -15,13 +15,19 @@ def fetch_dexscreener_tokens():
         return []
 
 def evaluate_and_find_queen(pairs):
-    """نظام التقييم الخارق من 10 نقاط + فحص السيولة والحجم"""
+    """نظام التقييم الخارق من 10 نقاط + استبعاد العملات الكبرى"""
     best_token = None
     max_score = -1
 
     for pair in pairs:
         # التأكد أن الشبكة هي Solana
         if pair.get("chainId") != "solana":
+            continue
+
+        symbol = pair.get("baseToken", {}).get("symbol", "").upper()
+        
+        # 🛑 استبعاد العملات الرئيسية مثل سولانا وغيرها للتركيز على الميمز فقط
+        if symbol in ["SOL", "ETH", "USDC", "USDT", "BTC", "WSOL"]:
             continue
 
         liquidity = pair.get("liquidity", {}).get("usd", 0) or 0
@@ -43,7 +49,7 @@ def evaluate_and_find_queen(pairs):
             score += 5
         elif volume_24h > 10000:
             score += 3
-        elif volume_24h > 20000: # تعزيز إضافي للزخم
+        elif volume_24h > 2000:
             score += 1
 
         # اختيار الملكة بناءً على الأعلى نقاطاً
@@ -51,7 +57,7 @@ def evaluate_and_find_queen(pairs):
             max_score = score
             best_token = {
                 "name": pair.get("baseToken", {}).get("name", "Unknown"),
-                "symbol": pair.get("baseToken", {}).get("symbol", "UNKNOWN"),
+                "symbol": symbol,
                 "address": pair.get("baseToken", {}).get("address", ""),
                 "liquidity": liquidity,
                 "volume_24h": volume_24h,
@@ -67,7 +73,6 @@ def send_discord_alert(token):
     if not token:
         return
 
-    # تحديد الحالة والتقييم الرمزي
     score = token["score"]
     if score >= 8:
         status_emoji = "🔥 عملة واعدة جداً (صاروخ محتمل)"
@@ -116,10 +121,10 @@ if __name__ == "__main__":
     pairs = fetch_dexscreener_tokens()
     if pairs:
         queen, score = evaluate_and_find_queen(pairs)
-        if queen and score >= 4: # نرسل فقط إن كانت السيولة والحجم يستحقان الانتباه
+        if queen and score >= 4:
             send_discord_alert(queen)
             print(f"Alert sent for queen: {queen['symbol']} with score {score}")
         else:
-            print("No high-quality tokens found in this batch. Skipping alert to avoid spam.")
+            print("No high-quality tokens found in this batch. Skipping alert.")
     else:
         print("No pairs fetched from API.")
