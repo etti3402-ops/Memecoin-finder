@@ -1,53 +1,52 @@
 import os
 import requests
 
-def get_real_solana_meme():
+def get_actual_meme_token():
     try:
-        # البحث المباشر في أحدث الأزواج المضافة أو منصة pump
-        url = "https://api.dexscreener.com/latest/dex/search?q=pump"
+        # استخدام نقطة نهاية جلب أحدث البروفايلات والعملات المضافة حديثاً
+        url = "https://api.dexscreener.com/latest/dex/tokens/latest"
         response = requests.get(url, timeout=15)
         
         if response.status_code == 200:
             data = response.json()
             pairs = data.get("pairs", [])
             
-            # تصفية دقيقة: شبكة سولانا، ومنصة pump أو raydium، واستبعاد عملة SOL نفسها
-            meme_pairs = [
-                p for p in pairs 
-                if p.get("chainId") == "solana" 
-                and p.get("baseToken", {}).get("symbol", "").upper() not in ["SOL", "USDC", "USDT", "WBTC"]
-            ]
+            # تصفية صارمة: عملات سولانا فقط، واستبعاد العملات الكبرى والمنصات مثل SOL أو PUMP
+            valid_memes = []
+            for p in pairs:
+                if p.get("chainId") == "solana":
+                    symbol = p.get("baseToken", {}).get("symbol", "").upper()
+                    # استبعاد الأسماء الكلاسيكية والوهمية
+                    if symbol not in ["SOL", "PUMP", "USDC", "USDT", "WBTC", "BONK", "WIF"]:
+                        valid_memes.append(p)
             
-            if meme_pairs:
-                # نأخذ أول عملة ميم حقيقية نشطة
-                top = meme_pairs[0]
+            if valid_memes:
+                top = valid_memes[0]
                 symbol = top.get("baseToken", {}).get("symbol", "UNKNOWN")
                 name = top.get("baseToken", {}).get("name", "Unknown")
                 dex = top.get("dexId", "unknown")
                 price = top.get("priceUsd", "0")
                 pair_address = top.get("pairAddress", "")
                 
-                # استخراج البيانات للدرس العميق
+                # بيانات الدرس العميق
                 liquidity = top.get("liquidity", {}).get("usd", 0) or 0
                 volume_24h = top.get("volume", {}).get("h24", 0) or 0
-                price_change = top.get("priceChange", {}).get("h24", 0) or 0
                 
                 link = top.get("url", f"https://dexscreener.com/solana/{pair_address}")
                 
-                # تقييم الدرس العميق لميم كوين
-                if liquidity > 5000 and volume_24h > 10000:
-                    verdict = "🔥 ميم كوين ناشط بحركة تداول ممتازة"
+                # تقييم الدرس العميق
+                if liquidity > 3000:
+                    verdict = "🔥 ميم كوين جديد بسيولة مقبولة"
                 else:
-                    verdict = "⚠️ ميم كوين جديد جداً (مخاطر عالية جداً - دير بالك)"
+                    verdict = "⚠️ ميم كوين ناشئ حديثاً جداً (مخاطر عالية/شديد الحذر)"
 
                 analysis_report = (
-                    f"🐸 **ميم كوين صواريخ على سولانا!**\n"
+                    f"🐸 **تم رصد ميم كوين حقيقي!**\n"
                     f"🏷️ **الاسم والرمز:** {name} (${symbol})\n"
                     f"🏦 **المنصة:** {dex.upper()}\n"
                     f"💵 **السعر:** ${price}\n"
                     f"💧 **السيولة:** ${liquidity:,.0f}\n"
-                    f"📈 **حجم التداول (24h):** ${volume_24h:,.0f}\n"
-                    f"📊 **تغير السعر:** {price_change}%\n\n"
+                    f"📈 **حجم التداول (24h):** ${volume_24h:,.0f}\n\n"
                     f"🧠 **الدرس العميق:** {verdict}\n"
                     f"🔗 **رابط الفحص المباشر:** {link}"
                 )
@@ -55,28 +54,24 @@ def get_real_solana_meme():
                 return symbol, analysis_report
         return None, None
     except Exception as e:
-        print(f"خطأ في جلب الميم كوين: {e}")
+        print(f"خطأ: {e}")
         return None, None
 
 def send_to_discord(coin, analysis):
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
     if not webhook_url:
-        print("رابط ديسكورد غير موجود!")
         return
 
     message = {
-        "content": f"🚀 **رصد ميم كوين حقيقي (Pump/Solana)!**\n\n- **الرمز:** ${coin}\n\n{analysis}"
+        "content": f"🚀 **صيد جديد (مـيـم كـويـن):** ${coin}\n\n{analysis}"
     }
     
-    response = requests.post(webhook_url, json=message)
-    if response.status_code == 204:
-        print("تم الإرسال لديسكورد بنجاح!")
-    else:
-        print(f"فشل الإرسال، الكود: {response.status_code}")
+    requests.post(webhook_url, json=message)
 
 if __name__ == "__main__":
-    coin, analysis = get_real_solana_meme()
+    coin, analysis = get_actual_meme_token()
     if coin:
         send_to_discord(coin, analysis)
+        print(f"تم إرسال العملة {coin} بنجاح!")
     else:
-        print("لم يتم العثور على عملات ميم حالياً.")
+        print("لم يتم العثور على عملة مطابقة.")
