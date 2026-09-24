@@ -1,9 +1,9 @@
-name: Run Meme Coin Bot
+name: Solana Meme Bot
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '*/10 * * * *' # يعمل تلقائياً كل 10 دقائق
+  workflow_dispatch: # يبقي زر التشغيل اليدوي متاحاً
 
 jobs:
   run-bot:
@@ -21,7 +21,7 @@ jobs:
         run: |
           pip install requests
 
-      - name: Run bot script
+      - name: Run bot
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
