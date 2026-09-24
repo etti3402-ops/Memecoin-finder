@@ -69,20 +69,25 @@ def evaluate_and_find_queen(pairs):
     return best_token, max_score
 
 def send_discord_alert(token):
-    """إرسال تقرير استثماري خارق ومفصل إلى ديسكورد"""
+    """إرسال تقرير استثماري خارق ومفصل إلى ديسكورد مع نصيحة استثمارية"""
     if not token:
         return
 
     score = token["score"]
+    
+    # تحديد الحالة، المخاطر، والنصيحة الاستثمارية بناءً على الخوارزمية
     if score >= 8:
         status_emoji = "🔥 عملة واعدة جداً (صاروخ محتمل)"
         risk_level = "🟢 منخفضة إلى متوسطة"
+        investment_advice = "✅ **نعم للاستثمار (فرصة قوية بمبلغ تجريبي ودراسة)**"
     elif score >= 4:
         status_emoji = "⚡ حركة مقبولة (تستحق المراقبة)"
         risk_level = "🟡 متوسطة"
+        investment_advice = "⚠️ **استثمار بحذر شديد (مضاربة سريعة وبرأس مال صغير جداً)**"
     else:
         status_emoji = "⚠️ ناشئة جداً (عالية المخاطر)"
         risk_level = "🔴 عالية جداً"
+        investment_advice = "❌ **لا تقم بالاستثمار (غير مستوفية للشروط الأساسية)**"
 
     payload = {
         "embeds": [
@@ -92,6 +97,7 @@ def send_discord_alert(token):
                 "color": 65280 if score >= 8 else 16776960,
                 "fields": [
                     {"name": "📊 التقييم النهائي", "value": f"**{score}/10** - {status_emoji}", "inline": False},
+                    {"name": "💡 النصيحة الاستثمارية", "value": investment_advice, "inline": False},
                     {"name": "💧 السيولة", "value": f"${token['liquidity']:,.2f}", "inline": True},
                     {"name": "📈 حجم التداول (24س)", "value": f"${token['volume_24h']:,.2f}", "inline": True},
                     {"name": "📉 التغير في السعر", "value": f"{token['price_change']}%", "inline": True},
@@ -104,7 +110,7 @@ def send_discord_alert(token):
                     }
                 ],
                 "footer": {
-                    "text": "Solana Meme Bot - Autonomous Alpha Scanner 🛡️"
+                    "text": "Solana Meme Bot - Autonomous Alpha Scanner 🛡️ | Not Financial Advice"
                 }
             }
         ]
@@ -121,7 +127,7 @@ if __name__ == "__main__":
     pairs = fetch_dexscreener_tokens()
     if pairs:
         queen, score = evaluate_and_find_queen(pairs)
-        if queen and score >= 4:
+        if queen and score >= 3: # خفضناها إلى 3 لضمان ظهور فرص جيدة للمتابعة والنصيحة
             send_discord_alert(queen)
             print(f"Alert sent for queen: {queen['symbol']} with score {score}")
         else:
