@@ -28,7 +28,7 @@ def get_token_age_hours(pair):
         return "غير معروف"
 
 def get_solana_meme_token():
-    """البحث عن عملة ميمز ذات جودة حقيقية وفلترتها بصرامة"""
+    """البحث عن عملة ميمز بمتطلبات مخففة ومرنة"""
     url = "https://api.dexscreener.com/latest/dex/search?q=solana"
     
     try:
@@ -48,7 +48,7 @@ def get_solana_meme_token():
 
             symbol = pair.get("baseToken", {}).get("symbol", "").upper()
             
-            # استبعاد العملات الكبرى
+            # استبعاد العملات الكبرى فقط
             if symbol in ["SOL", "ETH", "USDC", "USDT", "BTC", "WSOL"]:
                 continue
 
@@ -56,29 +56,26 @@ def get_solana_meme_token():
             volume_24h = pair.get("volume", {}).get("h24", 0) or 0
             price_change = pair.get("priceChange", {}).get("h24", 0) or 0
 
-            # نظام النقاط (حتى نستبعد العملات الميتة تماماً)
-            score = 0
-            if liquidity >= 10000:
-                score += 5
-            elif liquidity >= 3000:
-                score += 3
-            elif liquidity >= 1000:
-                score += 1
+            # نظام نقاط مخفف ومرن (أسهل في القبول)
+            score = 1 # نبدأ بنقطة أساسية لأي عملة نشطة
+            
+            if liquidity >= 2000:
+                score += 4
+            elif liquidity >= 500:
+                score += 2
 
-            if volume_24h >= 20000:
-                score += 5
-            elif volume_24h >= 5000:
-                score += 3
+            if volume_24h >= 5000:
+                score += 4
             elif volume_24h >= 1000:
-                score += 1
+                score += 2
 
-            # نختار فقط العملة التي تحوز على أعلى نقاط وتتجاوز الحد الأدنى (مثلاً 4 من 10)
-            if score > max_score and score >= 4:
+            # خفضنا الحد الأدنى للقبول إلى 3 نقاط لتسهيل ظهور الفرص المقبولة
+            if score > max_score and score >= 3:
                 max_score = score
                 age_str = get_token_age_hours(pair)
 
-                if score >= 8:
-                    investment_advice = "🟢 **نعم للاستثمار (فرصة قوية ومدروسة)**"
+                if score >= 7:
+                    investment_advice = "🟢 **نعم للاستثمار (فرصة جيدة ومدروسة)**"
                 else:
                     investment_advice = "🟡 **استثمار بحذر شديد (مضاربة سريعة)**"
 
@@ -102,15 +99,15 @@ def get_solana_meme_token():
         return None
 
 def send_to_discord(token):
-    """إرسال التقرير الاحترافي إلى ديسكورد عند مطابقة الشروط فقط"""
+    """إرسال التقرير إلى ديسكورد"""
     if not token or not DISCORD_WEBHOOK_URL:
         return
 
     payload = {
         "embeds": [
             {
-                "title": f"🚀 صيد عالي الجودة: {token['name']} ({token['symbol']})",
-                "description": "اجتازت هذه العملة معايير الفلترة والتقييم بنجاح تام.",
+                "title": f"🚀 فرصة ميمز مرصودة: {token['name']} ({token['symbol']})",
+                "description": "تم اجتياز شروط الفلترة المخففة والذكية بنجاح.",
                 "color": 3447003,
                 "fields": [
                     {"name": "📊 التقييم النهائي (Score)", "value": f"**{token['score']} / 10** ⭐", "inline": False},
@@ -127,22 +124,26 @@ def send_to_discord(token):
                     }
                 ],
                 "footer": {
-                    "text": "Solana Alpha Sniper Bot 🛡️ | Strict Quality Filter"
+                    "text": "Solana Alpha Sniper Bot 🛡️ | Flexible Filter Mode"
                 }
             }
         ]
     }
 
     try:
-        requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
-    except Exception:
-        pass
+        response = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
+        if response.status_code in [200, 204]:
+            print("✅ تم إرسال التقرير إلى ديسكورد بنجاح تام!")
+        else:
+            print(f"❌ فشل الإرسال، كود الرد: {response.status_code}")
+    except Exception as e:
+        print(f"❌ خطأ في الإرسال: {e}")
 
 if __name__ == "__main__":
-    print("🤖 جاري فحص السوق بمعايير الجودة الصارمة...")
+    print("🤖 جاري فحص السوق بمعايير مرنة...")
     token = get_solana_meme_token()
     if token:
         print(f"🎯 تم العثور على فرصة مطابقة: {token['symbol']} برصيد {token['score']}/10")
         send_to_discord(token)
     else:
-        print("🛡️ السوق هادئ أو لا توجد عملات تطابق معايير الجودة. لم يتم إرسال تنبيه.")
+        print("🛡️ السوق هادئ جداً حالياً ولم تتجاوز أي عملة الحد الأدنى المخفف.")
