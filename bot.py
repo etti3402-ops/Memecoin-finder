@@ -1,120 +1,125 @@
 import os
 import requests
-import json
 
-def get_best_solana_meme():
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+
+def fetch_dexscreener_tokens():
+    """جلب أحدث العملات والبروفايلات من DexScreener"""
+    url = "https://api.dexscreener.com/latest/dex/search?q=solana"
     try:
-        # 1. سحب أحدث البروفايلات والعملات المضافة حديثاً
-        url = "https://api.dexscreener.com/token-profiles/latest/v1"
-        response = requests.get(url, timeout=15)
-        
-        if response.status_code == 200:
-            profiles = response.json()
-            
-            best_score = -1
-            best_token_data = None
-            
-            # 2. المرور على جميع العملات الجديدة وفلترة شبكة سولانا
-            for profile in profiles:
-                if profile.get("chainId") == "solana":
-                    token_address = profile.get("tokenAddress")
-                    description = profile.get("description", "لا توجد تفاصيل إضافية")
-                    
-                    if token_address:
-                        # جلب تفاصيل السوق الحية لكل عملة على حدة
-                        pair_url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
-                        pair_res = requests.get(pair_url, timeout=10)
-                        
-                        if pair_res.status_code == 200:
-                            pair_data = pair_res.json()
-                            pairs = pair_data.get("pairs", [])
-                            
-                            if pairs:
-                                top = pairs[0]
-                                symbol = top.get("baseToken", {}).get("symbol", "UNKNOWN")
-                                name = top.get("baseToken", {}).get("name", "Unknown")
-                                price = top.get("priceUsd", "0")
-                                dex = top.get("dexId", "unknown")
-                                
-                                liquidity = top.get("liquidity", {}).get("usd", 0) or 0
-                                volume_24h = top.get("volume", {}).get("h24", 0) or 0
-                                link = top.get("url", f"https://dexscreener.com/solana/{token_address}")
-                                
-                                # 3. نظام النقاط الذكي (حساب قوة العملة مقارنة بالأخرى)
-                                current_score = 0
-                                
-                                # تقييم السيولة
-                                if liquidity > 20000:
-                                    current_score += 5
-                                elif liquidity > 5000:
-                                    current_score += 3
-                                elif liquidity > 1000:
-                                    current_score += 1
-                                    
-                                # تقييم حجم التداول
-                                if volume_24h > 50000:
-                                    current_score += 5
-                                elif volume_24h > 10000:
-                                    current_score += 3
-                                elif volume_24h > 2000:
-                                    current_score += 1
-
-                                # 4. الاحتفاظ بالعملة الحاصلة على أعلى نقاط في هذه الجولة
-                                if current_score > best_score:
-                                    best_score = current_score
-                                    
-                                    if best_score >= 8:
-                                        verdict = "🔥 عملة واعدة جداً (سيولة وحجم تداول قوي)"
-                                    elif best_score >= 4:
-                                        verdict = "⚡ عملة بحركة مقبولة (تستحق المراقبة)"
-                                    else:
-                                        verdict = "⚠️ عملة ناشئة جداً (مخاطر عالية)"
-
-                                    best_token_data = (
-                                        symbol,
-                                        (
-                                            f"🐸 **أفضل عملة تم اختيارها في هذه الجولة!**\n"
-                                            f"🏷️ **الاسم والرمز:** {name} (${symbol})\n"
-                                            f"🏦 **المنصة:** {dex.upper()}\n"
-                                            f"💵 **السعر:** ${price}\n"
-                                            f"💧 **السيولة:** ${liquidity:,.0f}\n"
-                                            f"📈 **حجم التداول (24h):** ${volume_24h:,.0f}\n"
-                                            f"⭐ **نقاط التقييم:** {best_score}/10\n\n"
-                                            f"🧠 **الدرس العميق:** {verdict}\n"
-                                            f"📝 **الوصف:** {description[:100]}...\n"
-                                            f"🔗 **رابط العقد المباشر:** {link}"
-                                        )
-                                    )
-            
-            # إرجاع أفضل عملة وُجدت بعد فحص القائمة كلها
-            if best_token_data:
-                return best_token_data
-                
-        return None, None
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        return data.get("pairs", [])
     except Exception as e:
-        print(f"خطأ تقني أثناء الفحص والمقارنة: {e}")
-        return None, None
+        print(f"Error fetching from DexScreener: {e}")
+        return []
 
-def send_to_discord(coin, analysis):
-    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
-    if not webhook_url:
-        print("رابط ديسكورد غير موجود!")
+def evaluate_and_find_queen(pairs):
+    """نظام التقييم الخارق من 10 نقاط + فحص السيولة والحجم"""
+    best_token = None
+    max_score = -1
+
+    for pair in pairs:
+        # التأكد أن الشبكة هي Solana
+        if pair.get("chainId") != "solana":
+            continue
+
+        liquidity = pair.get("liquidity", {}).get("usd", 0) or 0
+        volume_24h = pair.get("volume", {}).get("h24", 0) or 0
+        price_change_24h = pair.get("priceChange", {}).get("h24", 0) or 0
+
+        score = 0
+
+        # 1. معيار السيولة (بحد أقصى 5 نقاط)
+        if liquidity > 20000:
+            score += 5
+        elif liquidity > 5000:
+            score += 3
+        elif liquidity > 1000:
+            score += 1
+
+        # 2. معيار حجم التداول (بحد أقصى 5 نقاط)
+        if volume_24h > 50000:
+            score += 5
+        elif volume_24h > 10000:
+            score += 3
+        elif volume_24h > 20000: # تعزيز إضافي للزخم
+            score += 1
+
+        # اختيار الملكة بناءً على الأعلى نقاطاً
+        if score > max_score:
+            max_score = score
+            best_token = {
+                "name": pair.get("baseToken", {}).get("name", "Unknown"),
+                "symbol": pair.get("baseToken", {}).get("symbol", "UNKNOWN"),
+                "address": pair.get("baseToken", {}).get("address", ""),
+                "liquidity": liquidity,
+                "volume_24h": volume_24h,
+                "price_change": price_change_24h,
+                "score": score,
+                "url": pair.get("url", "https://dexscreener.com/solana")
+            }
+
+    return best_token, max_score
+
+def send_discord_alert(token):
+    """إرسال تقرير استثماري خارق ومفصل إلى ديسكورد"""
+    if not token:
         return
 
-    message = {
-        "content": f"🏆 **ملكة الدفعة (أفضل ميم كوين):** ${coin}\n\n{analysis}"
-    }
-    
-    response = requests.post(webhook_url, data=json.dumps(message), headers={"Content-Type": "application/json"})
-    if response.status_code == 204:
-        print("تم إرسال العملة الأفضل بنجاح إلى ديسكورد!")
+    # تحديد الحالة والتقييم الرمزي
+    score = token["score"]
+    if score >= 8:
+        status_emoji = "🔥 عملة واعدة جداً (صاروخ محتمل)"
+        risk_level = "🟢 منخفضة إلى متوسطة"
+    elif score >= 4:
+        status_emoji = "⚡ حركة مقبولة (تستحق المراقبة)"
+        risk_level = "🟡 متوسطة"
     else:
-        print(f"فشل الإرسال، كود الخطأ: {response.status_code}")
+        status_emoji = "⚠️ ناشئة جداً (عالية المخاطر)"
+        risk_level = "🔴 عالية جداً"
+
+    payload = {
+        "embeds": [
+            {
+                "title": f"🚀 Alpha Sniper: ملكة الدفعة المكتشفة!",
+                "description": f"**{token['name']} ({token['symbol']})**\nتم رصدها وتحليلها بنجاح بواسطة نظام الذكاء الاصطناعي.",
+                "color": 65280 if score >= 8 else 16776960,
+                "fields": [
+                    {"name": "📊 التقييم النهائي", "value": f"**{score}/10** - {status_emoji}", "inline": False},
+                    {"name": "💧 السيولة", "value": f"${token['liquidity']:,.2f}", "inline": True},
+                    {"name": "📈 حجم التداول (24س)", "value": f"${token['volume_24h']:,.2f}", "inline": True},
+                    {"name": "📉 التغير في السعر", "value": f"{token['price_change']}%", "inline": True},
+                    {"name": "🛡️ تقييم المخاطر", "value": risk_level, "inline": False},
+                    {"name": "📋 عقد العملة (Contract Address)", "value": f"`{token['address']}`", "inline": False},
+                    {
+                        "name": "🔗 روابط الشراكة السريعة والشارت", 
+                        "value": f"[DexScreener الشارت]({token['url']}) | [Photon صيد سريع](https://photon-sol.today/meme/{token['address']}) | [BullX](https://bullx.io/terminal?address={token['address']})", 
+                        "inline": False
+                    }
+                ],
+                "footer": {
+                    "text": "Solana Meme Bot - Autonomous Alpha Scanner 🛡️"
+                }
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
+        print(f"Discord response: {response.status_code}")
+    except Exception as e:
+        print(f"Error sending to Discord: {e}")
 
 if __name__ == "__main__":
-    print("جاري فحص جميع العملات الجديدة، مقارنتها، واستخراج الأفضل...")
-    coin, analysis = get_best_solana_meme()
-    if coin:
-        send_to_discord(coin, analysis)
+    print("Starting Advanced Solana Meme Bot Scan...")
+    pairs = fetch_dexscreener_tokens()
+    if pairs:
+        queen, score = evaluate_and_find_queen(pairs)
+        if queen and score >= 4: # نرسل فقط إن كانت السيولة والحجم يستحقان الانتباه
+            send_discord_alert(queen)
+            print(f"Alert sent for queen: {queen['symbol']} with score {score}")
+        else:
+            print("No high-quality tokens found in this batch. Skipping alert to avoid spam.")
     else:
-        print("لم يتم العثور على عملات مناسبة في هذه الجولة.")
+        print("No pairs fetched from API.")
