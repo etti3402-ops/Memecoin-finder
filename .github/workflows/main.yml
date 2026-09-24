@@ -2,8 +2,8 @@ name: Solana Meme Bot
 
 on:
   schedule:
-    - cron: '*/10 * * * *' # يعمل تلقائياً كل 10 دقائق
-  workflow_dispatch: # يبقي زر التشغيل اليدوي متاحاً
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 jobs:
   run-bot:
