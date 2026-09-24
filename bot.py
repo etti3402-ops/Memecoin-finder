@@ -1,71 +1,85 @@
 import os
 import requests
 
-def get_guaranteed_meme():
+def get_latest_solana_meme():
     try:
-        # البحث باستخدام مصطلح واسع وشامل لجلب أزواج تداول حية وفورية
-        url = "https://api.dexscreener.com/latest/dex/search?q=sol"
+        # استخدام نقطة النهاية الرسمية للبروفايلات والعملات المضافة حديثاً
+        url = "https://api.dexscreener.com/token-profiles/latest/v1"
         response = requests.get(url, timeout=15)
         
         if response.status_code == 200:
-            data = response.json()
-            pairs = data.get("pairs", [])
+            profiles = response.json()
             
-            # تصفية مرنة: نجلب أي عملة على سولانا ليست هي عملة SOL الرسمية نفسها
-            for p in pairs:
-                if p.get("chainId") == "solana":
-                    symbol = p.get("baseToken", {}).get("symbol", "").upper()
-                    # نتأكد أنها ليست SOL الأساسية أو العملات الكبرى لكي تكون ميم كوين حقيقي
-                    if symbol and symbol not in ["SOL", "USDC", "USDT"]:
+            # البحث عن أول عملة تنتمي لشبكة سولانا
+            for profile in profiles:
+                if profile.get("chainId") == "solana":
+                    token_address = profile.get("tokenAddress")
+                    description = profile.get("description", "لا توجد تفاصيل إضافية")
+                    
+                    if token_address:
+                        # جلب تفاصيل السعر والسيولة الفعلية للعملة عبر عنوان العقد مباشرة
+                        pair_url = f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
+                        pair_res = requests.get(pair_url, timeout=10)
                         
-                        name = p.get("baseToken", {}).get("name", "Unknown")
-                        dex = p.get("dexId", "unknown")
-                        price = p.get("priceUsd", "0")
-                        pair_address = p.get("pairAddress", "")
-                        
-                        liquidity = p.get("liquidity", {}).get("usd", 0) or 0
-                        volume_24h = p.get("volume", {}).get("h24", 0) or 0
-                        
-                        link = p.get("url", f"https://dexscreener.com/solana/{pair_address}")
-                        
-                        # الدرس العميق المبسط والسريع
-                        if liquidity > 5000:
-                            verdict = "🔥 ميم كوين بسيولة جيدة ومقبولة"
-                        else:
-                            verdict = "⚠️ ميم كوين ناشئ (سيولة ضعيفة - مخاطر عالية)"
+                        if pair_res.status_code == 200:
+                            pair_data = pair_res.json()
+                            pairs = pair_data.get("pairs", [])
+                            
+                            if pairs:
+                                top = pairs[0]
+                                symbol = top.get("baseToken", {}).get("symbol", "UNKNOWN")
+                                name = top.get("baseToken", {}).get("name", "Unknown")
+                                price = top.get("priceUsd", "0")
+                                dex = top.get("dexId", "unknown")
+                                
+                                liquidity = top.get("liquidity", {}).get("usd", 0) or 0
+                                volume_24h = top.get("volume", {}).get("h24", 0) or 0
+                                link = top.get("url", f"https://dexscreener.com/solana/{token_address}")
+                                
+                                # الدرس العميق وتقييم العملة
+                                if liquidity > 2000:
+                                    verdict = "🔥 ميم كوين ناشط بسيولة مقبولة"
+                                else:
+                                    verdict = "⚠️ ميم كوين جديد جداً (مخاطر عالية جداً - دير بالك)"
 
-                        analysis_report = (
-                            f"🐸 **الاسم والرمز:** {name} (${symbol})\n"
-                            f"🏦 **المنصة:** {dex.upper()}\n"
-                            f"💵 **السعر:** ${price}\n"
-                            f"💧 **السيولة:** ${liquidity:,.0f}\n"
-                            f"📈 **حجم التداول (24h):** ${volume_24h:,.0f}\n\n"
-                            f"🧠 **الدرس العميق:** {verdict}\n"
-                            f"🔗 **رابط الفحص:** {link}"
-                        )
-                        
-                        return symbol, analysis_report
-                        
+                                report = (
+                                    f"🐸 **تم رصد ميم كوين جديد على سولانا!**\n"
+                                    f"🏷️ **الاسم والرمز:** {name} (${symbol})\n"
+                                    f"🏦 **المنصة:** {dex.upper()}\n"
+                                    f"💵 **السعر:** ${price}\n"
+                                    f"💧 **السيولة:** ${liquidity:,.0f}\n"
+                                    f"📈 **حجم التداول (24h):** ${volume_24h:,.0f}\n\n"
+                                    f"🧠 **الدرس العميق:** {verdict}\n"
+                                    f"📝 **الوصف:** {description[:120]}...\n"
+                                    f"🔗 **رابط العقد المباشر:** {link}"
+                                )
+                                return symbol, report
+                                
         return None, None
     except Exception as e:
-        print(f"خطأ: {e}")
+        print(f"خطأ تقني: {e}")
         return None, None
 
 def send_to_discord(coin, analysis):
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
     if not webhook_url:
+        print("رابط ديسكورد غير موجود!")
         return
 
     message = {
-        "content": f"🚀 **صيد ميم كوين جديد على سولانا:** ${coin}\n\n{analysis}"
+        "content": f"🚀 **صيد آلي (ميم كوين سولانا):** ${coin}\n\n{analysis}"
     }
     
-    requests.post(webhook_url, json=message)
+    response = requests.post(webhook_url, json=message)
+    if response.status_code == 204:
+        print("تم إرسال العملة بنجاح إلى ديسكورد!")
+    else:
+        print(f"فشل الإرسال، كود الخطأ: {response.status_code}")
 
 if __name__ == "__main__":
-    coin, analysis = get_guaranteed_meme()
+    print("جاري جلب أحدث عملات سولانا وتحليلها...")
+    coin, analysis = get_latest_solana_meme()
     if coin:
         send_to_discord(coin, analysis)
-        print(f"تم إرسال العملة {coin} بنجاح إلى ديسكورد!")
     else:
-        print("لم يتم العثور على نتائج.")
+        print("تعذر جلب العملة في هذه المحاولة، جاري إعادة المحاولة في الجولة القادمة.")
