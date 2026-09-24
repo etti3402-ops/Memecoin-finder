@@ -1,47 +1,90 @@
 import os
 import requests
-import re
 
-# وضع اسم المستخدم للحوت الذي تريد متابعته على تويتر (بدون علامة @)
-WHALE_USERNAME = "WhaleWire"  # يمكنك تغييره إلى أي حساب حوت آخر
+def analyze_deep_dive(pair):
+    """
+    إجراء دراسة عميقة وتقييم للعملة بناءً على السيولة، حجم التداول، ونشاط السوق.
+    """
+    coin_name = pair.get("baseToken", {}).get("name", "Unknown")
+    coin_symbol = pair.get("baseToken", {}).get("symbol", "UNKNOWN")
+    chain_id = pair.get("chainId", "solana")
+    dex_id = pair.get("dexId", "unknown")
+    pair_address = pair.get("pairAddress", "")
+    price_usd = pair.get("priceUsd", "0")
+    
+    # استخراج بيانات السيولة وحجم التداول
+    liquidity = pair.get("liquidity", {})
+    usd_liquidity = liquidity.get("usd", 0) if liquidity else 0
+    
+    volume = pair.get("volume", {})
+    h24_volume = volume.get("h24", 0) if volume else 0
+    
+    # الفلترة والتقييم العميق (Risk & Potential Analysis)
+    score = 0
+    status_notes = []
+    
+    # 1. تقييم السيولة (Liquidity Check)
+    if usd_liquidity > 50000:
+        score += 3
+        status_notes.append("✅ سيولة ممتازة ومريحة (أكثر من 50 ألف دولار).")
+    elif usd_liquidity > 10000:
+        score += 2
+        status_notes.append("⚠️ سيولة متوسطة (الحذر مطلوب).")
+    else:
+        score += 1
+        status_notes.append("🚨 سيولة ضعيفة جداً (مخاطر عالية للتعليق).")
+        
+    # 2. تقييم حجم التداول (Volume Check)
+    if h24_volume > 100000:
+        score += 3
+        status_notes.append("🚀 حجم تداول قوي جداً يشير لاهتمام السوق.")
+    elif h24_volume > 20000:
+        score += 2
+        status_notes.append("📊 حجم تداول متوسط.")
+    else:
+        score += 1
+        status_notes.append("💤 تفاعل ضعيف نسبياً في الـ 24 ساعة الماضية.")
 
-def get_latest_tweet():
+    # الحكم النهائي بناءً على النقاط
+    if score >= 5:
+        verdict = "🔥 عملة واعدة ذات اهتمام عالي (ترند قوي)"
+    elif score >= 3:
+        verdict = "⚡ عملة ذات حركة مقبولة (تتطلب مراقبة لصيقة)"
+    else:
+        verdict = "⚠️ مخاطرة عالية جداً (قد تكون مجرد سكام أو ميتة)"
+
+    url_link = pair.get("url", f"https://dexscreener.com/{chain_id}/{pair_address}")
+    
+    analysis_report = (
+        f"🌐 **الشبكة:** {chain_id.upper()} ({dex_id.upper()})\n"
+        f"💵 **السعر:** ${price_usd}\n"
+        f"💧 **السيولة (Liquidity):** ${usd_liquidity:,.0f}\n"
+        f"📈 **حجم التداول (24h):** ${h24_volume:,.0f}\n\n"
+        f"🔍 **تقرير الدرس العميق:**\n" + "\n".join(status_notes) + f"\n\n"
+        f"📌 **التقييم النهائي:** {verdict}\n"
+        f"🔗 **رابط الفحص المباشر:** {url_link}"
+    )
+    
+    return coin_symbol, analysis_report
+
+def get_best_trending_meme():
     try:
-        # استخدام خدمة بديلة مجانية لجلب آخر تغريدات الحساب بشكل نصي وبدون API معقد
-        url = f"https://nitter.poast.org/{WHALE_USERNAME}/rss"
-        response = requests.get(url, timeout=10)
+        url = "https://api.dexscreener.com/latest/dex/tokens/trending"
+        response = requests.get(url, timeout=15)
         
         if response.status_code == 200:
-            # استخراج محتوى التغريدات باستخدام تعبير برمجي بسيط (Regex)
-            from xml.etree import ElementTree as ET
-            root = ET.fromstring(response.content)
+            data = response.json()
+            pairs = data.get("pairs", [])
             
-            # جلب أحدث تغريدة
-            for item in root.findall('.//item'):
-                tweet_text = item.find('description').text
-                return tweet_text
-        return None
-    except Exception as e:
-        print(f"خطأ أثناء جلب تغريدات الحوت: {e}")
-        return None
-
-def analyze_coin(tweet):
-    if not tweet:
+            if pairs:
+                # نبحث عن أول عملة تحقق شروط مقبولة أو نأخذ الأقوى
+                for top_pair in pairs:
+                    coin_symbol, report = analyze_deep_dive(top_pair)
+                    return coin_symbol, report
         return None, None
-        
-    # البحث عن رموز العملات التي تبدأ بعلامة $ أو كلمات تدل على العقود
-    # مثل البحث عن رمز مكون من أحرف كبيرة بعد علامة الدولار
-    coin_match = re.findall(r'\$([A-Z0-9]{2,10})', tweet)
-    
-    if coin_match:
-        # أخذ أول رمز عملة يتم العثور عليه في التغريدة
-        coin_name = coin_match[0]
-        
-        # تحليل مبدئي ذكي للعملة بناءً على نص التغريدة
-        analysis_result = f"تم رصده في تغريدة حقيقية للحساب @{WHALE_USERNAME}.\nالنص الأصلي: {tweet[:100]}..."
-        return coin_name, analysis_result
-        
-    return None, None
+    except Exception as e:
+        print(f"خطأ أثناء جلب وتحليل السوق: {e}")
+        return None, None
 
 def send_to_discord(coin, analysis):
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
@@ -51,22 +94,20 @@ def send_to_discord(coin, analysis):
         return
 
     message = {
-        "content": f"🚨 **تنبيه عملة ميم حقيقية من الحوت!**\n\n- **العملة المستخرجة:** ${coin}\n- **التحليل:** {analysis}\n- **الحالة:** تم الفحص الآلي ✅"
+        "content": f"🧠 **تقرير تحليل عميق لعملة ميم جديدة!**\n\n- **العملة:** ${coin}\n\n{analysis}"
     }
     
     response = requests.post(webhook_url, json=message)
     if response.status_code == 204:
-        print("تم إرسال التنبيه إلى ديسكورد بنجاح!")
+        print("تم إرسال تقرير التحليل العميق إلى ديسكورد بنجاح!")
     else:
         print(f"فشل في الإرسال، كود الخطأ: {response.status_code}")
 
 if __name__ == "__main__":
-    tweet = get_latest_tweet()
-    if tweet:
-        coin, analysis = analyze_coin(tweet)
-        if coin:
-            send_to_discord(coin, analysis)
-        else:
-            print("لم يتم العثور على اسم عملة جديدة في آخر تغريدة.")
+    print("جاري سحب العملة وإجراء الدرس العميق والتحليل الفني...")
+    coin, analysis = get_best_trending_meme()
+    
+    if coin:
+        send_to_discord(coin, analysis)
     else:
-        print("تعذر جلب التغريدة الحالية.")
+        print("لم يتم العثور على عملات مطابقة للمعايير حالياً.")
