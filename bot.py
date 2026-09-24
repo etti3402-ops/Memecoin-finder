@@ -28,7 +28,7 @@ def get_token_age_hours(pair):
         return "غير معروف"
 
 def get_solana_meme_token():
-    """البحث عن عملة ميمز بمتطلبات مخففة ومرنة"""
+    """البحث عن العملة مع نظام الطوارئ (ضمان الحصول على نتيجة دائماً)"""
     url = "https://api.dexscreener.com/latest/dex/search?q=solana"
     
     try:
@@ -40,7 +40,9 @@ def get_solana_meme_token():
             return None
 
         best_token = None
+        absolute_best_token = None
         max_score = -1
+        absolute_max_score = -999
 
         for pair in pairs:
             if pair.get("chainId") != "solana":
@@ -56,9 +58,8 @@ def get_solana_meme_token():
             volume_24h = pair.get("volume", {}).get("h24", 0) or 0
             price_change = pair.get("priceChange", {}).get("h24", 0) or 0
 
-            # نظام نقاط مخفف ومرن (أسهل في القبول)
-            score = 1 # نبدأ بنقطة أساسية لأي عملة نشطة
-            
+            # حساب النقاط
+            score = 1
             if liquidity >= 2000:
                 score += 4
             elif liquidity >= 500:
@@ -69,30 +70,51 @@ def get_solana_meme_token():
             elif volume_24h >= 1000:
                 score += 2
 
-            # خفضنا الحد الأدنى للقبول إلى 3 نقاط لتسهيل ظهور الفرص المقبولة
+            # الاحتفاظ بأفضل عملة مطلقة في السوق حالياً (حتى لو كانت بنقاط قليلة)
+            if score > absolute_max_score:
+                absolute_max_score = score
+                absolute_best_token = pair
+
+            # البحث عن العملة التي تتجاوز الشرط الطبيعي (3 نقاط فأكثر)
             if score > max_score and score >= 3:
                 max_score = score
-                age_str = get_token_age_hours(pair)
+                best_token = pair
 
-                if score >= 7:
-                    investment_advice = "🟢 **نعم للاستثمار (فرصة جيدة ومدروسة)**"
-                else:
-                    investment_advice = "🟡 **استثمار بحذر شديد (مضاربة سريعة)**"
+        # إذا وجدنا عملة تطابق الشروط الجيدة، نختارها
+        chosen_pair = best_token if best_token else absolute_best_token
 
-                best_token = {
-                    "name": pair.get("baseToken", {}).get("name", "Unknown Token"),
-                    "symbol": symbol,
-                    "address": pair.get("baseToken", {}).get("address", "N/A"),
-                    "liquidity": liquidity,
-                    "volume_24h": volume_24h,
-                    "price_change": price_change,
-                    "score": score,
-                    "age": age_str,
-                    "advice": investment_advice,
-                    "url": pair.get("url", "https://dexscreener.com/solana")
-                }
+        if not chosen_pair:
+            return None
 
-        return best_token
+        # تجهيز بيانات العملة المختارة
+        symbol = chosen_pair.get("baseToken", {}).get("symbol", "").upper()
+        liquidity = chosen_pair.get("liquidity", {}).get("usd", 0) or 0
+        volume_24h = chosen_pair.get("volume", {}).get("h24", 0) or 0
+        price_change = chosen_pair.get("priceChange", {}).get("h24", 0) or 0
+        
+        final_score = max(max_score if best_token else absolute_max_score, 1)
+
+        if final_score >= 7:
+            investment_advice = "🟢 **نعم للاستثمار (فرصة جيدة ومدروسة)**"
+        elif final_score >= 3:
+            investment_advice = "🟡 **استثمار بحذر شديد (مضاربة سريعة)**"
+        else:
+            investment_advice = "🔴 **سوق هادئ - مخاطرة عالية (للمراقبة فقط)**"
+
+        age_str = get_token_age_hours(chosen_pair)
+
+        return {
+            "name": chosen_pair.get("baseToken", {}).get("name", "Unknown Token"),
+            "symbol": symbol,
+            "address": chosen_pair.get("baseToken", {}).get("address", "N/A"),
+            "liquidity": liquidity,
+            "volume_24h": volume_24h,
+            "price_change": price_change,
+            "score": final_score,
+            "age": age_str,
+            "advice": investment_advice,
+            "url": chosen_pair.get("url", "https://dexscreener.com/solana")
+        }
 
     except Exception as e:
         print(f"⚠️ خطأ أثناء جلب البيانات: {e}")
@@ -106,8 +128,8 @@ def send_to_discord(token):
     payload = {
         "embeds": [
             {
-                "title": f"🚀 فرصة ميمز مرصودة: {token['name']} ({token['symbol']})",
-                "description": "تم اجتياز شروط الفلترة المخففة والذكية بنجاح.",
+                "title": f"🚀 تقرير السوق: {token['name']} ({token['symbol']})",
+                "description": "تم فحص السوق (حتى في أوقات الهدوء) وإحضار أفضل خيار متاح حالياً.",
                 "color": 3447003,
                 "fields": [
                     {"name": "📊 التقييم النهائي (Score)", "value": f"**{token['score']} / 10** ⭐", "inline": False},
@@ -124,7 +146,7 @@ def send_to_discord(token):
                     }
                 ],
                 "footer": {
-                    "text": "Solana Alpha Sniper Bot 🛡️ | Flexible Filter Mode"
+                    "text": "Solana Alpha Sniper Bot 🛡️ | Quiet Market Fallback Mode"
                 }
             }
         ]
@@ -140,10 +162,10 @@ def send_to_discord(token):
         print(f"❌ خطأ في الإرسال: {e}")
 
 if __name__ == "__main__":
-    print("🤖 جاري فحص السوق بمعايير مرنة...")
+    print("🤖 جاري فحص السوق (مع تفعيل وضع الطوارئ للسوق الهادئ)...")
     token = get_solana_meme_token()
     if token:
-        print(f"🎯 تم العثور على فرصة مطابقة: {token['symbol']} برصيد {token['score']}/10")
+        print(f"🎯 تم اختيار العملة بنجاح: {token['symbol']} برصيد {token['score']}/10")
         send_to_discord(token)
     else:
-        print("🛡️ السوق هادئ جداً حالياً ولم تتجاوز أي عملة الحد الأدنى المخفف.")
+        print("🛡️ لم يتم العثور على أي بيانات إطلاقاً.")
