@@ -15,7 +15,7 @@ def fetch_dexscreener_tokens():
         return []
 
 def evaluate_and_find_queen(pairs):
-    """نظام التقييم الخارق من 10 نقاط + استبعاد العملات الكبرى"""
+    """تقييم العملات من 10 نقاط واستبعاد العملات الكبرى"""
     best_token = None
     max_score = -1
 
@@ -26,7 +26,7 @@ def evaluate_and_find_queen(pairs):
 
         symbol = pair.get("baseToken", {}).get("symbol", "").upper()
         
-        # 🛑 استبعاد العملات الرئيسية مثل سولانا وغيرها للتركيز على الميمز فقط
+        # استبعاد العملات الرئيسية مثل سولانا وغيرها للتركيز على الميمز فقط
         if symbol in ["SOL", "ETH", "USDC", "USDT", "BTC", "WSOL"]:
             continue
 
@@ -69,48 +69,32 @@ def evaluate_and_find_queen(pairs):
     return best_token, max_score
 
 def send_discord_alert(token):
-    """إرسال تقرير استثماري خارق ومفصل إلى ديسكورد مع نصيحة استثمارية"""
+    """إرسال التقرير البسيط والمرن مع السكور إلى ديسكورد"""
     if not token:
         return
 
     score = token["score"]
-    
-    # تحديد الحالة، المخاطر، والنصيحة الاستثمارية بناءً على الخوارزمية
-    if score >= 8:
-        status_emoji = "🔥 عملة واعدة جداً (صاروخ محتمل)"
-        risk_level = "🟢 منخفضة إلى متوسطة"
-        investment_advice = "✅ **نعم للاستثمار (فرصة قوية بمبلغ تجريبي ودراسة)**"
-    elif score >= 4:
-        status_emoji = "⚡ حركة مقبولة (تستحق المراقبة)"
-        risk_level = "🟡 متوسطة"
-        investment_advice = "⚠️ **استثمار بحذر شديد (مضاربة سريعة وبرأس مال صغير جداً)**"
-    else:
-        status_emoji = "⚠️ ناشئة جداً (عالية المخاطر)"
-        risk_level = "🔴 عالية جداً"
-        investment_advice = "❌ **لا تقم بالاستثمار (غير مستوفية للشروط الأساسية)**"
 
     payload = {
         "embeds": [
             {
-                "title": f"🚀 Alpha Sniper: ملكة الدفعة المكتشفة!",
-                "description": f"**{token['name']} ({token['symbol']})**\nتم رصدها وتحليلها بنجاح بواسطة نظام الذكاء الاصطناعي.",
-                "color": 65280 if score >= 8 else 16776960,
+                "title": f"🚀 ملكة الدفعة (Solana Meme Bot)",
+                "description": f"**{token['name']} ({token['symbol']})**",
+                "color": 3447003,
                 "fields": [
-                    {"name": "📊 التقييم النهائي", "value": f"**{score}/10** - {status_emoji}", "inline": False},
-                    {"name": "💡 النصيحة الاستثمارية", "value": investment_advice, "inline": False},
+                    {"name": "📊 التقييم النهائي (Score)", "value": f"**{score} / 10**", "inline": False},
                     {"name": "💧 السيولة", "value": f"${token['liquidity']:,.2f}", "inline": True},
                     {"name": "📈 حجم التداول (24س)", "value": f"${token['volume_24h']:,.2f}", "inline": True},
                     {"name": "📉 التغير في السعر", "value": f"{token['price_change']}%", "inline": True},
-                    {"name": "🛡️ تقييم المخاطر", "value": risk_level, "inline": False},
                     {"name": "📋 عقد العملة (Contract Address)", "value": f"`{token['address']}`", "inline": False},
                     {
-                        "name": "🔗 روابط الشراكة السريعة والشارت", 
-                        "value": f"[DexScreener الشارت]({token['url']}) | [Photon صيد سريع](https://photon-sol.today/meme/{token['address']}) | [BullX](https://bullx.io/terminal?address={token['address']})", 
+                        "name": "🔗 روابط سريعة", 
+                        "value": f"[DexScreener]({token['url']}) | [Photon](https://photon-sol.today/meme/{token['address']}) | [BullX](https://bullx.io/terminal?address={token['address']})", 
                         "inline": False
                     }
                 ],
                 "footer": {
-                    "text": "Solana Meme Bot - Autonomous Alpha Scanner 🛡️ | Not Financial Advice"
+                    "text": "Solana Meme Bot - Normal Mode with Score 🛡️"
                 }
             }
         ]
@@ -123,14 +107,15 @@ def send_discord_alert(token):
         print(f"Error sending to Discord: {e}")
 
 if __name__ == "__main__":
-    print("Starting Advanced Solana Meme Bot Scan...")
+    print("Starting Solana Meme Bot Scan...")
     pairs = fetch_dexscreener_tokens()
     if pairs:
         queen, score = evaluate_and_find_queen(pairs)
-        if queen and score >= 3: # خفضناها إلى 3 لضمان ظهور فرص جيدة للمتابعة والنصيحة
+        if queen:
+            # تم إزالة الشرط الصارم، سيعرض أي عملة يجدها مع السكور الخاص بها
             send_discord_alert(queen)
             print(f"Alert sent for queen: {queen['symbol']} with score {score}")
         else:
-            print("No high-quality tokens found in this batch. Skipping alert.")
+            print("No tokens found.")
     else:
         print("No pairs fetched from API.")
