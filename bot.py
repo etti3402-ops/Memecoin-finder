@@ -1,5 +1,6 @@
 import os
 import requests
+import json
 
 def get_best_solana_meme():
     try:
@@ -104,7 +105,7 @@ def send_to_discord(coin, analysis):
         "content": f"🏆 **ملكة الدفعة (أفضل ميم كوين):** ${coin}\n\n{analysis}"
     }
     
-    response = requests.post(webhook_url, json.dumps(message), headers={"Content-Type": "application/json"})
+    response = requests.post(webhook_url, data=json.dumps(message), headers={"Content-Type": "application/json"})
     if response.status_code == 204:
         print("تم إرسال العملة الأفضل بنجاح إلى ديسكورد!")
     else:
